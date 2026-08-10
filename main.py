@@ -1,11 +1,11 @@
 import os
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Status
+from fastapi import fastAPI, HTTPException, Status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from supabase import create_client, Client
 
-app = FastAPI(title="Aroge Tera API")
+app = fastAPI(title="Aroge Tera API")
 
 # CORS Configuration
 app.add_middleware(
