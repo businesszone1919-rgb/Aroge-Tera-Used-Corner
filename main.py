@@ -1,13 +1,13 @@
 import os
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, status
-
+from fastapi import FastAPI, HTTPException, Status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from supabase import create_client, Client
 
 app = FastAPI(title="Aroge Tera API")
 
+# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,10 +16,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Supabase Connection
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Data Schemas
 class UserRegister(BaseModel):
     id: int
     first_name: str
@@ -35,6 +37,8 @@ class ProductCreate(BaseModel):
     category_id: int
     condition: str
     images: List[str] = []
+
+# --- API Endpoints ---
 
 @app.get("/")
 def home():
