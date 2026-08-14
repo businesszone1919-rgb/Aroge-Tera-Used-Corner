@@ -7,7 +7,7 @@ from supabase import create_client, Client
 
 app = FastAPI(title="Aroge Tera Mini App API")
 
-# CORS ፈቃድ (ከ Telegram Mini App ለሚመጡ ጥሪዎች)
+# CORS ፈቃድ - ከቴሌግራም Mini App የሚመጣን ማንኛውንም ጥሪ ለመቀበል
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,7 +16,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Supabase ቁልፎችን ከ Environment መውሰድ
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
@@ -28,8 +27,6 @@ if SUPABASE_URL and SUPABASE_KEY:
         print(f"Supabase connection error: {e}")
 
 
-# --- Pydantic Data Models ---
-
 class ProductCreate(BaseModel):
     title: str
     description: Optional[str] = ""
@@ -37,35 +34,27 @@ class ProductCreate(BaseModel):
     category_id: Optional[int] = None
     condition: Optional[str] = "በጣም ጥሩ"
     images: Optional[List[str]] = []
-    seller_telegram_id: Optional[str] = "guest"
+    seller_telegram_id: Optional[str] = "guest_user"
     seller_phone: Optional[str] = None
 
 
-# --- API Endpoints ---
-
 @app.get("/")
 def home():
-    return {"message": "እንኳን ወደ አሮጌ ተራ API በሰላም መጡ!"}
+    return {"status": "online", "message": "አሮጌ ተራ API በትክክል እየሰራ ነው!"}
 
 
-# 1. ሁሉንም እቃዎች ማምጣት (Get All Products)
+# 1. ሁሉንም እቃዎች ማምጣት
 @app.get("/products")
-
 def get_products(category_id: Optional[int] = None, search: Optional[str] = None):
     if not supabase:
         raise HTTPException(
-            status_code=500, 
-            detail="Supabase Connection Error! Render Environment Variables ላይ SUPABASE_URL እና SUPABASE_KEY መኖራቸውን አረጋግጥ።"
+            status_code=500, detail="Supabase connection not configured"
         )
     
     try:
         query = supabase.table("products").select("*")
-        
-        # በካቴጎሪ ለመለየት
         if category_id:
             query = query.eq("category_id", category_id)
-            
-        # በስም ለመፈለግ
         if search:
             query = query.ilike("title", f"%{search}%")
             
@@ -75,7 +64,7 @@ def get_products(category_id: Optional[int] = None, search: Optional[str] = None
         raise HTTPException(status_code=500, detail=f"Database Query Error: {str(e)}")
 
 
-# 2. የአንድን እቃ ዝርዝር መረጃ ማምጣት
+# 2. የአንድ እቃ ዝርዝር
 @app.get("/products/{product_id}")
 def get_product_detail(product_id: int):
     if not supabase:
@@ -90,7 +79,7 @@ def get_product_detail(product_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# 3. አዲስ እቃ መሸጫ መለጠፍ
+# 3. አዲስ እቃ መለጠፍ
 @app.post("/products", status_code=status.HTTP_201_CREATED)
 def create_product(product: ProductCreate):
     if not supabase:
@@ -98,33 +87,11 @@ def create_product(product: ProductCreate):
     
     try:
         data = product.dict()
+        # ባዶ ኢሜጅ ካለ ማጽዳት
+        if data.get("images"):
+            data["images"] = [img for img in data["images"] if img.strip()]
+
         response = supabase.table("products").insert(data).execute()
         return {"message": "እቃው በትክክል ተለጥፏል", "data": response.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"እቃውን መለጠፍ አልተቻለም: {str(e)}")
-
-
-# 4. እቃ ተሸጧል ብሎ መቀየር
-@app.patch("/products/{product_id}/sold")
-def mark_as_sold(product_id: int):
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase connection not configured")
-        
-    try:
-        response = supabase.table("products").update({"is_sold": True}).eq("id", product_id).execute()
-        return {"message": "እቃው ተሸጧል ተብሎ ተቀይሯል", "data": response.data}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# 5. ካቴጎሪዎችን ማምጣት
-@app.get("/categories")
-def get_categories():
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase connection not configured")
-        
-    try:
-        response = supabase.table("categories").select("*").execute()
-        return response.data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
