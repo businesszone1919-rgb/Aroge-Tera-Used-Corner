@@ -20,7 +20,7 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-6 border-b pb-3">
         <h1 class="text-2xl font-bold text-emerald-600">🛒 አሮጌ ተራ</h1>
-        <span id="user-name" class="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full"></span>
+        <span id="user-name" class="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">ተጠቃሚ</span>
     </div>
 
     <!-- Navigation Tabs -->
@@ -79,10 +79,10 @@
     </div>
 
     <script>
-        // የተስተካከለው ትክክለኛው የ Render URL (መጨረሻው ላይ -1 የሌለው)
         const API_BASE_URL = "https://aroge-tera-used-corner.onrender.com";
         const tg = window.Telegram?.WebApp;
         
+        // Telegram WebApp Initialization
         if (tg) {
             tg.ready();
             tg.expand();
@@ -119,11 +119,9 @@
             list.classList.add('hidden');
 
             try {
-                // Endpoint-ኡን /items እና /products ሁለቱንም ለመሞከር እንዲመች
-                let res = await fetch(`${API_BASE_URL}/items`);
-                if (!res.ok) {
-                    res = await fetch(`${API_BASE_URL}/products`);
-                }
+                // ቀጥታ ወደ /products ብቻ ጥሪ ማድረግ
+                const res = await fetch(`${API_BASE_URL}/products`);
+                if (!res.ok) throw new Error("Network response was not ok");
                 
                 const products = await res.json();
 
@@ -132,10 +130,21 @@
                     list.innerHTML = '<p class="text-center text-gray-500 py-8">ምንም የተለጠፈ እቃ የለም።</p>';
                 } else {
                     products.forEach(item => {
-                        const img = (item.images && item.images.length > 0) ? item.images[0] : (item.image_url || 'https://via.placeholder.com/300x200?text=No+Image');
+                        const img = (item.images && item.images.length > 0 && item.images[0].trim() !== "") 
+                            ? item.images[0] 
+                            : 'https://via.placeholder.com/300x200?text=No+Image';
+
+                        // የሻጭ ቴሌግራም አድራሻ ማስተካከያ
+                        let contactUrl = "#";
+                        if (item.seller_telegram_id && item.seller_telegram_id !== "guest_user") {
+                            contactUrl = item.seller_telegram_id.startsWith("@") 
+                                ? `https://t.me/${item.seller_telegram_id.replace('@', '')}` 
+                                : `https://t.me/${item.seller_telegram_id}`;
+                        }
+
                         const card = `
                             <div class="bg-white rounded-xl shadow-sm overflow-hidden border">
-                                <img src="${img}" class="w-full h-48 object-cover" alt="${item.title}">
+                                <img src="${img}" class="w-full h-48 object-cover" alt="${item.title}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
                                 <div class="p-4">
                                     <div class="flex justify-between items-start">
                                         <h3 class="font-bold text-lg">${item.title}</h3>
@@ -143,9 +152,13 @@
                                     </div>
                                     <p class="text-emerald-600 font-extrabold text-xl my-1">${item.price} ብር</p>
                                     <p class="text-gray-600 text-sm mb-3">${item.description || 'ምንም መግለጫ የለውም'}</p>
-                                    <a href="https://t.me/${item.seller_telegram_id || ''}" target="_blank" class="block text-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold py-2 rounded-lg text-sm border border-emerald-200">
-                                        💬 ሻጭን ያናግሩ
-                                    </a>
+                                    ${contactUrl !== "#" ? `
+                                        <a href="${contactUrl}" target="_blank" class="block text-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold py-2 rounded-lg text-sm border border-emerald-200">
+                                            💬 ሻጭን ያናግሩ
+                                        </a>
+                                    ` : `
+                                        <span class="block text-center bg-gray-100 text-gray-500 py-2 rounded-lg text-sm">ያልተገለጸ ሻጭ</span>
+                                    `}
                                 </div>
                             </div>
                         `;
@@ -153,7 +166,8 @@
                     });
                 }
             } catch (err) {
-                list.innerHTML = '<p class="text-center text-red-500 py-8">እቃዎችን መጫን አልተቻለም።</p>';
+                console.error("Fetch Error:", err);
+                list.innerHTML = '<p class="text-center text-red-500 py-8">እቃዎችን መጫን አልተቻለም። እባክዎ እንደገና ይሞክሩ።</p>';
             } finally {
                 loading.classList.add('hidden');
                 list.classList.remove('hidden');
@@ -167,7 +181,7 @@
             submitBtn.innerText = "እየተለጠፈ ነው...";
 
             const user = tg?.initDataUnsafe?.user;
-            const sellerId = user?.username || user?.id?.toString() || "guest_user";
+            const sellerId = user?.username ? `@${user.username}` : (user?.id?.toString() || "guest_user");
 
             const imageUrl = document.getElementById('imageUrl').value;
             const payload = {
@@ -180,27 +194,19 @@
             };
 
             try {
-                // በመጀመሪያ ወደ /items ይፖስታል፣ ካልተሳካ ወደ /products ይሞክራል
-                let res = await fetch(`${API_BASE_URL}/items`, {
+                const res = await fetch(`${API_BASE_URL}/products`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-
-                if (!res.ok) {
-                    res = await fetch(`${API_BASE_URL}/products`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                }
 
                 if (res.ok) {
                     alert("እቃው በትክክል ተለጥፏል!");
                     document.getElementById('product-form').reset();
                     switchTab('feed');
                 } else {
-                    alert("ስህተት ተከስቷል! እባክዎ ድጋሚ ይሞክሩ።");
+                    const errData = await res.json();
+                    alert("ስህተት ተከስቷል: " + (errData.detail || "እባክዎ ድጋሚ ይሞክሩ"));
                 }
             } catch (err) {
                 alert("ከሰርቨር ጋር ማገናኘት አልተቻለም።");
@@ -210,7 +216,8 @@
             }
         }
 
-        fetchProducts();
+        // ገፁ ሲከፈት በራስ-ሰር ዳታ እንዲጭን
+        document.addEventListener('DOMContentLoaded', fetchProducts);
     </script>
 </body>
 </html>
